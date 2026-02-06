@@ -6,7 +6,17 @@ from io import BytesIO
 from multiprocessing.pool import ThreadPool
 from typing import Dict, List, Tuple
 from tqdm import tqdm
+import logging.config
+import json
 import requests
+
+logger = logging.getLogger(__name__)
+
+
+def setup_logging():
+    with open("src/logging_configs/config.json", "r") as f:
+        config = json.load(f)
+    logging.config.dictConfig(config)
 
 NUM_PROCESSES = 8
 MAX_RESULTS = 300
@@ -53,7 +63,7 @@ def make_queries() -> Dict[str, str]:
         Dict[str, str]
             A dictionary of queries
     """
-    print("Making queries")
+    logger.debug("Making queries")
     queries = dict()
     for animal in ANIMALS_LIST:
         queries[animal] = list()
@@ -82,6 +92,7 @@ def download_images(images: List[Dict[str, str]], folder: Path):
         folder: Path
             The folder to save the images to
     """
+    logger.debug("Downloading %d images to %s", len(images), folder)
     for image in images:
         try:
             url = image["image"]
@@ -95,9 +106,9 @@ def download_images(images: List[Dict[str, str]], folder: Path):
             pil_image.save(path, format="JPEG", quality=95)
             pil_image.close()
         except requests.exceptions.RequestException as e:
-            print(f"Error downloading {image['image']}: {e}")
+            logger.error("Error downloading %s: %s", image["image"], e)
         except Exception as e:
-            print(f"Error downloading {image['image']}: {e}")
+            logger.error("Error downloading %s: %s", image["image"], e)
 
 def _download_worker(animal_images: Tuple[str, List[Dict[str, str]]]):
     """Worker for pool: downloads images for one animal."""
@@ -105,6 +116,7 @@ def _download_worker(animal_images: Tuple[str, List[Dict[str, str]]]):
     folder = Path("images") / animal
     folder.mkdir(parents=True, exist_ok=True)
     download_images(images, folder)
+    logger.debug("Downloaded %d images for %s", len(images), animal)
     return {"animal": animal, "length": len(images)}
 
 def search_images(query: str, max_results: int = 100) -> List[Dict[str, str]]:
@@ -130,6 +142,7 @@ def search_images(query: str, max_results: int = 100) -> List[Dict[str, str]]:
             - width: The image width
             - source: The image source
     """
+    logger.debug("Searching for images for %s", query)
     try:
         with DDGS() as ddgs:
             images = ddgs.images(
@@ -139,17 +152,17 @@ def search_images(query: str, max_results: int = 100) -> List[Dict[str, str]]:
                 type_image="photo",
                 max_results=max_results,
             )
-            print(f"Found {len(images)} images for {query}")
+            logger.info("Found %d images for %s", len(images), query)
             return list(images)
     except DDGSException as e:
-        print(f"No results for '{query}': {e}")
+        logger.warning("No results for '%s': %s", query, e)
         return []
 
 def get_images():
     """
     Creates queries for each animal and plush combination and downloads the images 
     """
-    print("Starting to get images")
+    logger.debug("Starting to get images")
     queries: Dict[str, List[str]] = make_queries()
     images_by_animal: Dict[str, List[Dict[str, str]]] = dict()
 
@@ -165,7 +178,8 @@ def get_images():
     with ThreadPool(processes=NUM_PROCESSES) as p:
         results = p.imap_unordered(_download_worker, images_by_animal.items())
         for result in results:
-            print(f"{result['animal']}: {result['length']} images downloaded")
+            logger.info("%s: %d images downloaded", result["animal"], result["length"])
 
 if __name__ == "__main__":
+    setup_logging()
     get_images()

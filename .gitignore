@@ -33,3 +33,6 @@ images/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Logs
+logs/
