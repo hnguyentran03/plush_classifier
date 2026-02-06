@@ -1,0 +1,35 @@
+# Environment
+.env
+.env.local
+*.pem
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Downloaded images (from get_images.py)
+images/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
