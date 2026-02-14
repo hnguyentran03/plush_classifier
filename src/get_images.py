@@ -99,7 +99,7 @@ def download_images(images: List[Dict[str, str]], folder: Path):
             filename = url.split("/")[-1]
             path = folder / filename
 
-            r = requests.get(url)
+            r = requests.get(url, timeout=30)
             r.raise_for_status()
             
             pil_image = Image.open(BytesIO(r.content))
@@ -113,11 +113,12 @@ def download_images(images: List[Dict[str, str]], folder: Path):
 def _download_worker(animal_images: Tuple[str, List[Dict[str, str]]]):
     """Worker for pool: downloads images for one animal."""
     animal, images = animal_images
-    folder = Path("images") / animal
+    folder = Path("images") / animal.replace(" ", "_")
     folder.mkdir(parents=True, exist_ok=True)
     download_images(images, folder)
-    logger.debug("Downloaded %d images for %s", len(images), animal)
-    return {"animal": animal, "length": len(images)}
+    num_images = len(list(folder.glob("*.jpg")))
+    logger.debug("Downloaded %d images for %s", num_images, animal)
+    return {"animal": animal, "length": num_images}
 
 def search_images(query: str, max_results: int = 100) -> List[Dict[str, str]]:
     """
@@ -176,9 +177,11 @@ def get_images():
 
     # Download each animal's images in parallel
     with ThreadPool(processes=NUM_PROCESSES) as p:
-        results = p.imap_unordered(_download_worker, images_by_animal.items())
-        for result in results:
-            logger.info("%s: %d images downloaded", result["animal"], result["length"])
+        results = list(
+            p.imap_unordered(_download_worker, images_by_animal.items(), chunksize=1)
+        )
+    for result in results:
+        logger.info("%s: %d images downloaded", result["animal"], result["length"])
 
 if __name__ == "__main__":
     setup_logging()
