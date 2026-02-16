@@ -19,7 +19,7 @@ def setup_logging():
     logging.config.dictConfig(config)
 
 NUM_PROCESSES = 8
-MAX_RESULTS = 300
+MAX_RESULTS = 1000
 
 ANIMALS_LIST = [
     "cat",
@@ -110,12 +110,23 @@ def download_images(images: List[Dict[str, str]], folder: Path):
         except Exception as e:
             logger.error("Error downloading %s: %s", image["image"], e)
 
+def cleanup_folder(folder: Path):
+    """
+    Cleans up a folder by removing all files except for the most recent 100
+    """
+    logger.debug("Cleaning up %s by removing non-jpg files", folder)
+    for file in folder.glob("*"):
+        if file.is_file() and file.suffix != ".jpg":
+            file.unlink()
+    logger.debug("Cleaned up %s", folder)
+
 def _download_worker(animal_images: Tuple[str, List[Dict[str, str]]]):
     """Worker for pool: downloads images for one animal."""
     animal, images = animal_images
     folder = Path("images") / animal.replace(" ", "_")
     folder.mkdir(parents=True, exist_ok=True)
     download_images(images, folder)
+    cleanup_folder(folder)
     num_images = len(list(folder.glob("*.jpg")))
     logger.debug("Downloaded %d images for %s", num_images, animal)
     return {"animal": animal, "length": num_images}
@@ -180,8 +191,12 @@ def get_images():
         results = list(
             p.imap_unordered(_download_worker, images_by_animal.items(), chunksize=1)
         )
+    
+    count = 0
     for result in results:
         logger.info("%s: %d images downloaded", result["animal"], result["length"])
+        count += result["length"]
+    logger.info("Downloaded %d images", count)
 
 if __name__ == "__main__":
     setup_logging()
