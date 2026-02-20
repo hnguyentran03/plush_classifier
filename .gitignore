@@ -36,3 +36,6 @@ images/
 
 # Logs
 logs/
+
+# Model
+models/
